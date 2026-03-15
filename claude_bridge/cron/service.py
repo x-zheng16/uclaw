@@ -122,8 +122,11 @@ class CronScheduler:
                     soonest_ms = nxt
 
             if soonest is None or soonest_ms is None:
-                # No jobs to run — sleep a bit and re-check
-                await asyncio.sleep(0.5)
+                # No jobs to run — park until cancelled by _arm_timer or stop
+                try:
+                    await asyncio.sleep(3600)
+                except asyncio.CancelledError:
+                    return
                 continue
 
             delay_s = max(0, (soonest_ms - _now_ms()) / 1000)

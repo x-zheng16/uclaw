@@ -88,19 +88,23 @@ class CronJob:
 class CronStore:
     path: Path
     jobs: list[CronJob] = field(default_factory=list)
-    _last_mtime: float = field(default=0.0, repr=False)
+    _last_load_mtime: float = field(default=0.0, repr=False)
+    _last_save_mtime: float = field(default=0.0, repr=False)
 
     def load(self) -> None:
         if not self.path.exists():
             self.jobs = []
             return
-        data = json.loads(self.path.read_text())
-        self.jobs = [CronJob.from_dict(j) for j in data]
-        self._last_mtime = self.path.stat().st_mtime
+        raw = json.loads(self.path.read_text())
+        job_list = raw.get("jobs", raw) if isinstance(raw, dict) else raw
+        self.jobs = [CronJob.from_dict(j) for j in job_list]
+        mtime = self.path.stat().st_mtime
+        self._last_load_mtime = mtime
+        self._last_save_mtime = mtime
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        data = json.dumps([j.to_dict() for j in self.jobs], indent=2)
+        data = json.dumps({"jobs": [j.to_dict() for j in self.jobs]}, indent=2)
         # Atomic write: write to tmp file in same dir, then rename
         fd, tmp = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp", prefix=".jobs_")
         try:
@@ -110,7 +114,7 @@ class CronStore:
         except BaseException:
             Path(tmp).unlink(missing_ok=True)
             raise
-        self._last_mtime = self.path.stat().st_mtime
+        self._last_save_mtime = self.path.stat().st_mtime
 
     def add(self, job: CronJob) -> None:
         self.jobs.append(job)
@@ -121,6 +125,8 @@ class CronStore:
         return len(self.jobs) < before
 
     def has_changed(self) -> bool:
+        """Detect external changes: mtime differs from both our last load AND our last save."""
         if not self.path.exists():
             return False
-        return self.path.stat().st_mtime != self._last_mtime
+        current_mtime = self.path.stat().st_mtime
+        return current_mtime != self._last_load_mtime and current_mtime != self._last_save_mtime

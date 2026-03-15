@@ -194,10 +194,11 @@ class TestCronStore:
         store.add(job)
         store.save()
 
-        # File should be valid JSON
+        # File should be valid JSON with {"jobs": [...]} format
         data = json.loads(path.read_text())
-        assert isinstance(data, list)
-        assert len(data) == 1
+        assert isinstance(data, dict)
+        assert "jobs" in data
+        assert len(data["jobs"]) == 1
 
     def test_has_changed_detects_external_write(self, tmp_path: Path):
         path = tmp_path / "jobs.json"

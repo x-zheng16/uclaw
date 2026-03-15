@@ -272,7 +272,7 @@ class TestHotReload:
             return "ok"
 
         store = CronStore(path=tmp_path / "jobs.json")
-        store.add(_make_job(every_ms=50, message="will-be-removed"))
+        store.add(_make_job(every_ms=500, message="will-be-removed"))
         store.save()
 
         bus = MessageBus()
@@ -282,19 +282,18 @@ class TestHotReload:
         await scheduler.start()
 
         # Let it fire at least once
-        await asyncio.sleep(0.15)
+        await asyncio.sleep(0.6)
         assert len(calls) >= 1
 
-        # Externally empty the jobs file
-        await asyncio.sleep(0.05)
-        (tmp_path / "jobs.json").write_text("[]")
+        # Externally empty the jobs file (between job fires)
+        (tmp_path / "jobs.json").write_text('{"jobs": []}')
 
-        # Wait for reload to pick up the change (reload_interval=0.1s)
-        await asyncio.sleep(0.25)
+        # Wait for reload to pick up the change
+        await asyncio.sleep(0.3)
 
         # After reload, snapshot and wait — no new fires should happen
         snapshot = len(calls)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.6)
         await scheduler.stop()
 
         assert len(calls) == snapshot, "job kept firing after reload removed it"
