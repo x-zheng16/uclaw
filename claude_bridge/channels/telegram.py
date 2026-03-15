@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import logging
+
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters
+
+from claude_bridge.bus import MessageBus
+from claude_bridge.channels.base import BaseChannel
+
+logger = logging.getLogger(__name__)
+
+
+def split_message(text: str, max_len: int = 4096) -> list[str]:
+    if len(text) <= max_len:
+        return [text]
+    parts: list[str] = []
+    while text:
+        if len(text) <= max_len:
+            parts.append(text)
+            break
+        # Try to split at last newline within max_len
+        cut = text.rfind("\n", 0, max_len)
+        if cut <= 0:
+            cut = max_len
+        else:
+            cut += 1  # include the newline in the current part
+        parts.append(text[:cut])
+        text = text[cut:]
+    return parts
+
+
+class TelegramChannel(BaseChannel):
+    name = "telegram"
+
+    def __init__(self, bus: MessageBus, token: str, allowed_users: list[str]) -> None:
+        super().__init__(bus, allowed_users)
+        self.token = token
+        self._app: Application | None = None
+
+    async def start(self) -> None:
+        self._app = Application.builder().token(self.token).build()
+        self._app.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_message)
+        )
+        await self._app.initialize()
+        await self._app.start()
+        await self._app.updater.start_polling(drop_pending_updates=True)
+        logger.info("telegram channel started")
+        # Block until stopped
+        stop_event = self._app.updater._stop_event  # type: ignore[union-attr]
+        if stop_event is not None:
+            await stop_event.wait()
+
+    async def stop(self) -> None:
+        if self._app is not None:
+            if self._app.updater and self._app.updater.running:
+                await self._app.updater.stop()
+            if self._app.running:
+                await self._app.stop()
+            await self._app.shutdown()
+            self._app = None
+
+    async def _on_message(self, update: Update, context: object) -> None:
+        if update.effective_message is None or update.effective_user is None:
+            return
+        sender_id = str(update.effective_user.id)
+        chat_id = str(update.effective_chat.id) if update.effective_chat else sender_id
+        text = update.effective_message.text or ""
+        await self._handle_message(sender_id, chat_id, text)
+
+    async def send(
+        self, chat_id: str, text: str, media: list[str] | None = None
+    ) -> None:
+        if self._app is None:
+            logger.warning("telegram app not initialized, cannot send")
+            return
+        for part in split_message(text):
+            await self._app.bot.send_message(chat_id=int(chat_id), text=part)
