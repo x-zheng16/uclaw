@@ -14,6 +14,7 @@ dependencies = [
 uclaw = "uclaw.cli:main"
 
 [project.optional-dependencies]
+gpu = ["faster-whisper>=1.0"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

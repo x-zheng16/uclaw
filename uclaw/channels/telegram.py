@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
 
 from uclaw.bus import MessageBus
 from uclaw.channels.base import BaseChannel
+from uclaw.transcribe import transcribe
 
 logger = logging.getLogger(__name__)
+
+MEDIA_DIR = Path.home() / ".uclaw" / "media"
 
 
 def split_message(text: str, max_len: int = 4096) -> list[str]:
@@ -44,6 +48,9 @@ class TelegramChannel(BaseChannel):
         self._app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_message)
         )
+        self._app.add_handler(
+            MessageHandler(filters.VOICE | filters.AUDIO, self._on_voice)
+        )
         await self._app.initialize()
         await self._app.start()
         await self._app.updater.start_polling(drop_pending_updates=True)
@@ -67,6 +74,26 @@ class TelegramChannel(BaseChannel):
         sender_id = str(update.effective_user.id)
         chat_id = str(update.effective_chat.id) if update.effective_chat else sender_id
         text = update.effective_message.text or ""
+        await self._handle_message(sender_id, chat_id, text)
+
+    async def _on_voice(self, update: Update, context: object) -> None:
+        if update.effective_message is None or update.effective_user is None:
+            return
+        msg = update.effective_message
+        voice_or_audio = msg.voice or msg.audio
+        if voice_or_audio is None:
+            return
+
+        sender_id = str(update.effective_user.id)
+        chat_id = str(update.effective_chat.id) if update.effective_chat else sender_id
+
+        MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+        file_path = str(MEDIA_DIR / f"{voice_or_audio.file_unique_id}.ogg")
+
+        tg_file = await voice_or_audio.get_file()
+        await tg_file.download_to_drive(file_path)
+
+        text = await transcribe(file_path)
         await self._handle_message(sender_id, chat_id, text)
 
     async def send(
