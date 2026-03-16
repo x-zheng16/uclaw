@@ -120,6 +120,7 @@ class SessionRouter:
             permission_mode=cc.permission_mode,
             setting_sources=cc.setting_sources,
             resume=resume_id,
+            cli_path=cc.cli_path,
         )
         client = ClaudeSDKClient(options=options)
         await client.connect()

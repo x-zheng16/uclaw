@@ -25,6 +25,7 @@ class ClaudeConfig:
     workspace: str = "~/workspace"
     permission_mode: str = "bypassPermissions"
     setting_sources: list[str] = field(default_factory=lambda: ["user", "project"])
+    cli_path: str | None = None
 
 
 @dataclass

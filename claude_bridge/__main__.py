@@ -29,6 +29,7 @@ async def execute_cron_job(message: str, channel: str, chat_id: str) -> str:
         cwd=config.claude.workspace,
         permission_mode=config.claude.permission_mode,
         setting_sources=config.claude.setting_sources,
+        cli_path=config.claude.cli_path,
     )
     result_text = ""
     async for msg in query(prompt=message, options=options):
