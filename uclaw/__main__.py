@@ -63,6 +63,7 @@ async def main() -> None:
             bus=bus,
             token=config.telegram.token,
             allowed_users=config.telegram.allowed_users,
+            groq_api_key=config.groq.api_key or None,
         )
     if config.feishu.enabled:
         from .channels.feishu import FeishuChannel

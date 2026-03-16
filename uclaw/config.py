@@ -29,10 +29,16 @@ class ClaudeConfig:
 
 
 @dataclass
+class GroqConfig:
+    api_key: str = ""
+
+
+@dataclass
 class BridgeConfig:
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     feishu: FeishuConfig = field(default_factory=FeishuConfig)
     claude: ClaudeConfig = field(default_factory=ClaudeConfig)
+    groq: GroqConfig = field(default_factory=GroqConfig)
 
 
 def load_config(path: Path) -> BridgeConfig:
@@ -43,4 +49,5 @@ def load_config(path: Path) -> BridgeConfig:
         telegram=TelegramConfig(**data.get("telegram", {})),
         feishu=FeishuConfig(**data.get("feishu", {})),
         claude=ClaudeConfig(**data.get("claude", {})),
+        groq=GroqConfig(**data.get("groq", {})),
     )

@@ -4,92 +4,42 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from uclaw.transcribe import transcribe, _model_cache
+from uclaw.transcribe import transcribe
 
 
-class TestTranscribeFallback:
-    """When faster_whisper is not installed, return a fallback string."""
+class TestTranscribeNoKey:
+    """When no Groq API key is provided, return a fallback string."""
 
     @pytest.mark.asyncio
-    async def test_fallback_when_no_whisper(self):
-        with patch("uclaw.transcribe._try_import_whisper", return_value=None):
-            # Clear any cached model
-            _model_cache.clear()
-            result = await transcribe("/tmp/test.ogg")
+    async def test_fallback_when_no_key(self):
+        result = await transcribe("/tmp/test.ogg")
         assert "[Voice message:" in result
-        assert "/tmp/test.ogg" in result
-
-
-class TestTranscribeWithWhisper:
-    """When faster_whisper is available, use it to transcribe."""
+        assert "no Groq API key" in result
 
     @pytest.mark.asyncio
-    async def test_transcribes_with_whisper(self):
-        fake_segment = MagicMock()
-        fake_segment.text = " Hello world"
+    async def test_fallback_when_empty_key(self):
+        result = await transcribe("/tmp/test.ogg", groq_api_key="")
+        assert "[Voice message:" in result
 
-        fake_model = MagicMock()
-        fake_model.transcribe.return_value = ([fake_segment], None)
 
-        fake_module = MagicMock()
-        fake_module.WhisperModel.return_value = fake_model
+class TestTranscribeWithGroq:
+    """When Groq API key is provided, call the API."""
 
-        with patch("uclaw.transcribe._try_import_whisper", return_value=fake_module):
-            _model_cache.clear()
-            result = await transcribe("/tmp/test.ogg")
+    @pytest.mark.asyncio
+    async def test_successful_transcription(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"text": " Hello world "}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("uclaw.transcribe._transcribe_groq", return_value="Hello world"):
+            result = await transcribe("/tmp/test.ogg", groq_api_key="fake-key")
 
         assert result == "Hello world"
-        fake_model.transcribe.assert_called_once_with("/tmp/test.ogg", beam_size=1)
 
     @pytest.mark.asyncio
-    async def test_model_is_cached(self):
-        fake_segment = MagicMock()
-        fake_segment.text = " Hi"
+    async def test_api_error_returns_fallback(self):
+        with patch("uclaw.transcribe._transcribe_groq", side_effect=Exception("API error")):
+            result = await transcribe("/tmp/test.ogg", groq_api_key="fake-key")
 
-        fake_model = MagicMock()
-        fake_model.transcribe.return_value = ([fake_segment], None)
-
-        fake_module = MagicMock()
-        fake_module.WhisperModel.return_value = fake_model
-
-        with patch("uclaw.transcribe._try_import_whisper", return_value=fake_module):
-            _model_cache.clear()
-            await transcribe("/tmp/a.ogg")
-            await transcribe("/tmp/b.ogg")
-
-        # WhisperModel should only be constructed once (cached)
-        assert fake_module.WhisperModel.call_count == 1
-        assert fake_model.transcribe.call_count == 2
-
-    @pytest.mark.asyncio
-    async def test_empty_transcription(self):
-        fake_model = MagicMock()
-        fake_model.transcribe.return_value = ([], None)
-
-        fake_module = MagicMock()
-        fake_module.WhisperModel.return_value = fake_model
-
-        with patch("uclaw.transcribe._try_import_whisper", return_value=fake_module):
-            _model_cache.clear()
-            result = await transcribe("/tmp/empty.ogg")
-
-        assert result == ""
-
-    @pytest.mark.asyncio
-    async def test_strips_leading_whitespace(self):
-        seg1 = MagicMock()
-        seg1.text = "  Hello "
-        seg2 = MagicMock()
-        seg2.text = " world  "
-
-        fake_model = MagicMock()
-        fake_model.transcribe.return_value = ([seg1, seg2], None)
-
-        fake_module = MagicMock()
-        fake_module.WhisperModel.return_value = fake_model
-
-        with patch("uclaw.transcribe._try_import_whisper", return_value=fake_module):
-            _model_cache.clear()
-            result = await transcribe("/tmp/multi.ogg")
-
-        assert result == "Hello  world"
+        assert "[Voice message:" in result
+        assert "API error" in result

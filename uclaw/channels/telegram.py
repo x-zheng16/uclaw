@@ -38,9 +38,13 @@ def split_message(text: str, max_len: int = 4096) -> list[str]:
 class TelegramChannel(BaseChannel):
     name = "telegram"
 
-    def __init__(self, bus: MessageBus, token: str, allowed_users: list[str]) -> None:
+    def __init__(
+        self, bus: MessageBus, token: str, allowed_users: list[str],
+        groq_api_key: str | None = None,
+    ) -> None:
         super().__init__(bus, allowed_users)
         self.token = token
+        self._groq_api_key = groq_api_key
         self._app: Application | None = None
 
     async def start(self) -> None:
@@ -93,7 +97,7 @@ class TelegramChannel(BaseChannel):
         tg_file = await voice_or_audio.get_file()
         await tg_file.download_to_drive(file_path)
 
-        text = await transcribe(file_path)
+        text = await transcribe(file_path, groq_api_key=self._groq_api_key)
         await self._handle_message(sender_id, chat_id, text)
 
     async def send(
