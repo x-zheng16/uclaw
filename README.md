@@ -8,14 +8,27 @@ Claude Code is the brain — uclaw just routes messages and schedules tasks.
 ## How It Works
 
 ```
-You (Telegram / Feishu)
-  |  Bot API
-uclaw daemon (asyncio, ~1000 LOC)
-  |  Claude Agent SDK
-Claude Code CLI -> reads/writes your codebase
+You (Telegram / Feishu)          Cron Scheduler
+  |  Bot API                      |  (heartbeat, reminders, ...)
+  v                               v
+┌───────────────────────────────────────┐
+│         uclaw daemon (asyncio)        │
+│                                       │
+│  [inbound queue]  →  Session Router   │
+│  [outbound queue] ←  Claude Invoker   │
+└───────────────────────────────────────┘
+                    |
+                    |  Claude Agent SDK
+                    v
+          Claude Code CLI
+          reads/writes your codebase
+                    |
+                    v
+          Response streamed back
+          to Telegram / Feishu
 ```
 
-Send a message from your phone, Claude Code executes it on your server with full tool access (Read, Edit, Bash, etc.), skills, CLAUDE.md, and memory.
+Send a message from your phone or let cron trigger a task — Claude Code executes it on your server with full tool access (Read, Edit, Bash, etc.), skills, CLAUDE.md, and memory.
 Responses stream back to your chat.
 
 ## Comparison
