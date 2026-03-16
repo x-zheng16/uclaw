@@ -19,3 +19,5 @@ config.json
 *.pid
 sessions.json
 jobs.json
+deploy.sh
+deploy.sh
