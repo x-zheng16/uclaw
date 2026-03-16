@@ -14,6 +14,7 @@ class BaseChannel(ABC):
     def __init__(self, bus: MessageBus, allowed_users: list[str]) -> None:
         self.bus = bus
         self.allowed_users = allowed_users
+        self._running = True
 
     def is_allowed(self, sender_id: str) -> bool:
         if "*" in self.allowed_users:

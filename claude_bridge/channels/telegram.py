@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram import Update
@@ -47,12 +48,11 @@ class TelegramChannel(BaseChannel):
         await self._app.start()
         await self._app.updater.start_polling(drop_pending_updates=True)
         logger.info("telegram channel started")
-        # Block until stopped
-        stop_event = self._app.updater._stop_event  # type: ignore[union-attr]
-        if stop_event is not None:
-            await stop_event.wait()
+        while self._running:
+            await asyncio.sleep(1)
 
     async def stop(self) -> None:
+        self._running = False
         if self._app is not None:
             if self._app.updater and self._app.updater.running:
                 await self._app.updater.stop()
