@@ -14,7 +14,7 @@ from .router import SessionRouter
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path.home() / ".claude-bridge"
+DATA_DIR = Path.home() / ".uclaw"
 CONFIG_PATH = DATA_DIR / "config.json"
 CRON_PATH = DATA_DIR / "cron" / "jobs.json"
 

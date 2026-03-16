@@ -6,8 +6,8 @@ import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
 
-from claude_bridge.bus import MessageBus
-from claude_bridge.channels.base import BaseChannel
+from uclaw.bus import MessageBus
+from uclaw.channels.base import BaseChannel
 
 logger = logging.getLogger(__name__)
 

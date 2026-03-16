@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from claude_bridge.bus import MessageBus
-from claude_bridge.cron.service import CronScheduler
-from claude_bridge.cron.types import CronJob, CronSchedule, CronStore
+from uclaw.bus import MessageBus
+from uclaw.cron.service import CronScheduler
+from uclaw.cron.types import CronJob, CronSchedule, CronStore
 
 
 def _now_ms() -> int:

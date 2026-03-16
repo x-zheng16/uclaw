@@ -3,11 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Installing claude-bridge systemd service..."
-sudo cp "$SCRIPT_DIR/claude-bridge.service" /etc/systemd/system/
+echo "Installing uclaw systemd service..."
+sudo cp "$SCRIPT_DIR/uclaw.service" /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable claude-bridge
+sudo systemctl enable uclaw
 echo "Done."
-echo "  Start:  sudo systemctl start claude-bridge"
-echo "  Logs:   journalctl -u claude-bridge -f"
-echo "  Status: systemctl status claude-bridge"
+echo "  Start:  sudo systemctl start uclaw"
+echo "  Logs:   journalctl -u uclaw -f"
+echo "  Status: systemctl status uclaw"

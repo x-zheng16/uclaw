@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from claude_bridge.bus import MessageBus, OutboundMessage
-from claude_bridge.channels.base import BaseChannel
-from claude_bridge.channels.manager import ChannelManager
-from claude_bridge.channels.telegram import split_message
+from uclaw.bus import MessageBus, OutboundMessage
+from uclaw.channels.base import BaseChannel
+from uclaw.channels.manager import ChannelManager
+from uclaw.channels.telegram import split_message
 
 
 # ---------------------------------------------------------------------------

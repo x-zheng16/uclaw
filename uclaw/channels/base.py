@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 
-from claude_bridge.bus import InboundMessage, MessageBus
+from uclaw.bus import InboundMessage, MessageBus
 
 logger = logging.getLogger(__name__)
 

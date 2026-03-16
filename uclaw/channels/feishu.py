@@ -7,8 +7,8 @@ import threading
 from collections import OrderedDict
 from typing import Any
 
-from claude_bridge.bus import MessageBus
-from claude_bridge.channels.base import BaseChannel
+from uclaw.bus import MessageBus
+from uclaw.channels.base import BaseChannel
 
 logger = logging.getLogger(__name__)
 

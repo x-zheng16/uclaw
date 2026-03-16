@@ -6,8 +6,8 @@ import time
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from claude_bridge.bus import MessageBus, OutboundMessage
-from claude_bridge.cron.types import CronJob, CronStore
+from uclaw.bus import MessageBus, OutboundMessage
+from uclaw.cron.types import CronJob, CronStore
 
 logger = logging.getLogger(__name__)
 

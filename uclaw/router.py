@@ -14,8 +14,8 @@ from claude_agent_sdk import (
     TextBlock,
 )
 
-from claude_bridge.bus import InboundMessage, MessageBus, OutboundMessage
-from claude_bridge.config import BridgeConfig
+from uclaw.bus import InboundMessage, MessageBus, OutboundMessage
+from uclaw.config import BridgeConfig
 
 logger = logging.getLogger(__name__)
 

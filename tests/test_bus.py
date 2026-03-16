@@ -1,6 +1,6 @@
 import pytest
 
-from claude_bridge.bus import InboundMessage, MessageBus, OutboundMessage
+from uclaw.bus import InboundMessage, MessageBus, OutboundMessage
 
 
 def test_inbound_message_session_key():

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from claude_bridge.config import BridgeConfig, load_config
+from uclaw.config import BridgeConfig, load_config
 
 
 def test_load_config(tmp_path):

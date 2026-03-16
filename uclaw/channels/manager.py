@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from claude_bridge.bus import MessageBus
-from claude_bridge.channels.base import BaseChannel
+from uclaw.bus import MessageBus
+from uclaw.channels.base import BaseChannel
 
 logger = logging.getLogger(__name__)
 

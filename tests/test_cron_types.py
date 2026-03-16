@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 
-from claude_bridge.cron.types import CronJob, CronSchedule, CronStore
+from uclaw.cron.types import CronJob, CronSchedule, CronStore
 
 
 # ── CronSchedule ──────────────────────────────────────────────

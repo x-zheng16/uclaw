@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from claude_bridge.router import SessionStore
+from uclaw.router import SessionStore
 
 
 @pytest.fixture

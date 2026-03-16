@@ -1,16 +1,16 @@
 [Unit]
-Description=Claude Bridge - IM to Claude Code
+Description=uclaw - Turn Claude Code into OpenClaw
 After=network.target
 
 [Service]
 Type=simple
 User=xiang
 WorkingDirectory=/home/xiang
-ExecStart=/home/xiang/.local/bin/uv run --project /home/xiang/code/claude-bridge python -m claude_bridge
+ExecStart=/home/xiang/.local/bin/uv run --project /home/xiang/code/uclaw python -m uclaw
 Restart=always
 RestartSec=5
 Environment=HOME=/home/xiang
-EnvironmentFile=-/home/xiang/.claude-bridge/.env
+EnvironmentFile=-/home/xiang/.uclaw/.env
 StandardOutput=journal
 StandardError=journal
 

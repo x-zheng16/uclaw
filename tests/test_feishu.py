@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from claude_bridge.bus import MessageBus
-from claude_bridge.channels.feishu import FeishuChannel
+from uclaw.bus import MessageBus
+from uclaw.channels.feishu import FeishuChannel
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Simple process management for claude-bridge daemon."""
+"""Simple process management for uclaw daemon."""
 from __future__ import annotations
 
 import os
@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-PID_FILE = Path.home() / ".claude-bridge" / "bridge.pid"
+PID_FILE = Path.home() / ".uclaw" / "bridge.pid"
 
 
 def _read_pid() -> int | None:
@@ -33,14 +33,14 @@ def cmd_start() -> None:
         print(f"Already running (pid {_read_pid()})")
         return
     proc = subprocess.Popen(
-        [sys.executable, "-m", "claude_bridge"],
-        stdout=open(Path.home() / ".claude-bridge" / "logs" / "bridge.log", "a"),
+        [sys.executable, "-m", "uclaw"],
+        stdout=open(Path.home() / ".uclaw" / "logs" / "bridge.log", "a"),
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
     _write_pid(proc.pid)
     print(f"Started (pid {proc.pid})")
-    print(f"Logs: tail -f ~/.claude-bridge/logs/bridge.log")
+    print(f"Logs: tail -f ~/.uclaw/logs/bridge.log")
 
 
 def cmd_stop() -> None:
@@ -78,7 +78,7 @@ def cmd_status() -> None:
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: claude-bridge {start|stop|restart|status|run}")
+        print("Usage: uclaw {start|stop|restart|status|run}")
         sys.exit(1)
 
     cmd = sys.argv[1]
