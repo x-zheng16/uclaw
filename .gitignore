@@ -8,3 +8,14 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Secrets
+.env
+*.env
+config.json
+
+# Runtime data
+*.log
+*.pid
+sessions.json
+jobs.json
