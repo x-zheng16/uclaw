@@ -1,6 +1,10 @@
-# uclaw
+<p align="center">
+  <img src="logo.png" width="200" alt="uclaw logo">
+</p>
 
-Turn your Claude Code into OpenClaw.
+<h1 align="center">uclaw</h1>
+
+<p align="center">Turn your Claude Code into OpenClaw.</p>
 
 uclaw is an ultra-lightweight daemon that bridges Telegram and Feishu to Claude Code via the official [Python Agent SDK](https://github.com/anthropics/claude-agent-sdk-python).
 Claude Code is the brain — uclaw just routes messages and schedules tasks.
