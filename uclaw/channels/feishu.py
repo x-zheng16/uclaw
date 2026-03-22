@@ -177,7 +177,10 @@ class FeishuChannel(BaseChannel):
         )
 
         receive_id_type = "chat_id" if chat_id.startswith("oc_") else "open_id"
-        content = json.dumps({"text": text}, ensure_ascii=False)
+        card = {
+            "elements": [{"tag": "markdown", "content": text}],
+        }
+        content = json.dumps(card, ensure_ascii=False)
 
         try:
             request = (
@@ -186,7 +189,7 @@ class FeishuChannel(BaseChannel):
                 .request_body(
                     CreateMessageRequestBody.builder()
                     .receive_id(chat_id)
-                    .msg_type("text")
+                    .msg_type("interactive")
                     .content(content)
                     .build()
                 )
