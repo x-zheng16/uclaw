@@ -68,15 +68,30 @@ class SessionRouter:
     async def run(self) -> None:
         """Main loop: consume inbound messages and route to sessions."""
         logger.info("SessionRouter started")
+        self._tasks: dict[str, asyncio.Task] = {}
         while True:
             msg = await self._bus.consume_inbound()
-            try:
-                if msg.text.startswith("/"):
-                    await self._handle_command(msg)
-                else:
-                    await self._handle_message(msg)
-            except Exception:
-                logger.exception("Error handling message from %s", msg.session_key)
+            asyncio.create_task(self._dispatch(msg))
+
+    async def _dispatch(self, msg: InboundMessage) -> None:
+        """Handle a single message, serialized per session key."""
+        key = msg.session_key
+        # Wait for any in-flight task on the same session key
+        prev = self._tasks.get(key)
+        if prev and not prev.done():
+            await prev
+        task = asyncio.create_task(self._process(msg))
+        self._tasks[key] = task
+        await task
+
+    async def _process(self, msg: InboundMessage) -> None:
+        try:
+            if msg.text.startswith("/"):
+                await self._handle_command(msg)
+            else:
+                await self._handle_message(msg)
+        except Exception:
+            logger.exception("Error handling message from %s", msg.session_key)
 
     async def _handle_command(self, msg: InboundMessage) -> None:
         cmd = msg.text.strip().split()[0].lower()
