@@ -28,9 +28,27 @@ def _write_pid(pid: int) -> None:
     PID_FILE.write_text(str(pid))
 
 
+def _find_running() -> int | None:
+    """Find any running uclaw process (even without PID file)."""
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-f", "python.*-m uclaw"],
+            text=True,
+        ).strip()
+        my_pid = os.getpid()
+        for line in out.splitlines():
+            pid = int(line.strip())
+            if pid != my_pid:
+                return pid
+    except (subprocess.CalledProcessError, ValueError):
+        pass
+    return None
+
+
 def cmd_start() -> None:
-    if _read_pid():
-        print(f"Already running (pid {_read_pid()})")
+    pid = _read_pid() or _find_running()
+    if pid:
+        print(f"Already running (pid {pid})")
         return
     proc = subprocess.Popen(
         [sys.executable, "-m", "uclaw"],
