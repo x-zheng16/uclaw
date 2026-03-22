@@ -157,6 +157,9 @@ async def main() -> None:
 
     logger.info("claude-bridge started (channels: %s)", list(channels.keys()))
 
+    # Pre-create sessions for known chat IDs so first message is fast
+    await router.warm_up()
+
     await asyncio.gather(
         channel_mgr.start_all(),
         router.run(),

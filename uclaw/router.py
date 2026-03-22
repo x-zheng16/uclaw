@@ -65,6 +65,20 @@ class SessionRouter:
         self._store.load()
         self._clients: dict[str, ClaudeSDKClient] = {}
 
+    async def warm_up(self) -> None:
+        """Pre-create sessions for all known session keys."""
+        keys = list(self._store._data.keys())
+        if not keys:
+            return
+        logger.info("Warming up %d session(s)...", len(keys))
+        tasks = [self._create_session(key) for key in keys]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for key, result in zip(keys, results):
+            if isinstance(result, Exception):
+                logger.warning("Failed to warm up session %s: %s", key, result)
+            else:
+                logger.info("Warmed up session %s", key)
+
     async def run(self) -> None:
         """Main loop: consume inbound messages and route to sessions."""
         logger.info("SessionRouter started")
