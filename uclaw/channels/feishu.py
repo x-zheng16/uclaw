@@ -80,19 +80,21 @@ class FeishuChannel(BaseChannel):
 
             import lark_oapi.ws.client as _lark_ws_mod
 
-            ws_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(ws_loop)
-            _lark_ws_mod.loop = ws_loop
-            try:
-                while self._running:
+            while self._running:
+                ws_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(ws_loop)
+                _lark_ws_mod.loop = ws_loop
+                try:
+                    self._ws_client.start()
+                except Exception:
+                    logger.exception("feishu websocket error")
+                finally:
                     try:
-                        self._ws_client.start()
+                        ws_loop.close()
                     except Exception:
-                        logger.exception("feishu websocket error")
-                    if self._running:
-                        time.sleep(5)
-            finally:
-                ws_loop.close()
+                        pass
+                if self._running:
+                    time.sleep(5)
 
         self._ws_thread = threading.Thread(target=_run_ws, daemon=True)
         self._ws_thread.start()
