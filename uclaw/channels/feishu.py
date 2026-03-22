@@ -100,6 +100,10 @@ class FeishuChannel(BaseChannel):
         self._ws_thread.start()
         logger.info("feishu channel started (websocket)")
 
+        # Block so channel manager doesn't restart us immediately
+        while self._running:
+            await asyncio.sleep(1)
+
     async def stop(self) -> None:
         self._running = False
         logger.info("feishu channel stopped")
