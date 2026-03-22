@@ -361,5 +361,6 @@ class WeixinChannel(BaseChannel):
             }
             try:
                 await self._api_post("ilink/bot/sendmessage", payload)
+                logger.info("weixin: sent message to %s (%d chars)", chat_id, len(part))
             except Exception:
                 logger.exception("weixin: failed to send to %s", chat_id)

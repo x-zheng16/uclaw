@@ -202,5 +202,7 @@ class FeishuChannel(BaseChannel):
                     response.code,
                     response.msg,
                 )
+            else:
+                logger.info("feishu: sent message to %s (%d chars)", chat_id, len(text))
         except Exception:
             logger.exception("feishu send error")
