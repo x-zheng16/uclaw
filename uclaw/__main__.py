@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from .bus import MessageBus, OutboundMessage
@@ -41,11 +42,19 @@ async def execute_cron_job(message: str, channel: str, chat_id: str) -> str:
 
 
 async def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    )
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+
+    # Persist logs to ~/.uclaw/logs/ with rotation (5 MB x 3 files)
+    log_dir = DATA_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    file_handler = RotatingFileHandler(
+        log_dir / "uclaw.log", maxBytes=5 * 1024 * 1024, backupCount=3
+    )
+    file_handler.setFormatter(logging.Formatter(log_fmt))
+    logging.getLogger().addHandler(file_handler)
 
     if not CONFIG_PATH.exists():
         logger.error("Config not found at %s. Copy config.example.json and edit it.", CONFIG_PATH)
