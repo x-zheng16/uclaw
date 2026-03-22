@@ -21,6 +21,13 @@ class FeishuConfig:
 
 
 @dataclass
+class WeixinConfig:
+    enabled: bool = False
+    base_url: str = "https://ilinkai.weixin.qq.com"
+    allowed_users: list[str] = field(default_factory=lambda: ["*"])
+
+
+@dataclass
 class ClaudeConfig:
     workspace: str = "~/workspace"
     permission_mode: str = "bypassPermissions"
@@ -37,6 +44,7 @@ class GroqConfig:
 class BridgeConfig:
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     feishu: FeishuConfig = field(default_factory=FeishuConfig)
+    weixin: WeixinConfig = field(default_factory=WeixinConfig)
     claude: ClaudeConfig = field(default_factory=ClaudeConfig)
     groq: GroqConfig = field(default_factory=GroqConfig)
 
@@ -48,6 +56,7 @@ def load_config(path: Path) -> BridgeConfig:
     return BridgeConfig(
         telegram=TelegramConfig(**data.get("telegram", {})),
         feishu=FeishuConfig(**data.get("feishu", {})),
+        weixin=WeixinConfig(**data.get("weixin", {})),
         claude=ClaudeConfig(**data.get("claude", {})),
         groq=GroqConfig(**data.get("groq", {})),
     )

@@ -6,7 +6,7 @@
 
 <p align="center">Turn your Claude Code into OpenClaw.</p>
 
-uclaw is an ultra-lightweight daemon that bridges Telegram and Feishu to Claude Code via the official [Python Agent SDK](https://github.com/anthropics/claude-agent-sdk-python).
+uclaw is an ultra-lightweight daemon that bridges Telegram, Feishu, and WeChat to Claude Code via the official [Python Agent SDK](https://github.com/anthropics/claude-agent-sdk-python).
 Claude Code is the brain — uclaw just routes messages and schedules tasks.
 
 ## How It Works
@@ -25,7 +25,7 @@ Responses stream back to your chat.
 | **Agent brain** | Claude Code CLI | Own agent loop | Claude Code CLI |
 | **Language** | Python | Python | TypeScript |
 | **Source LOC** | ~1,000 | ~15,000 | ~500 + upstream lib |
-| **Channels** | 2 (Telegram, Feishu) | 11 | 4 |
+| **Channels** | 3 (Telegram, Feishu, WeChat) | 11 | 4 |
 | **Cron scheduler** | Built-in | Built-in | No |
 | **Heartbeat** | Cron job | Separate service | No |
 | **Session resume** | Yes | Own session files | Yes |
@@ -39,7 +39,7 @@ We adopted nanobot's async message bus and single-timer cron scheduler patterns,
 
 ## Features
 
-- **Telegram + Feishu** — long polling and WebSocket, no public IP needed
+- **Telegram + Feishu + WeChat** — long polling and WebSocket, no public IP needed
 - **Persistent sessions** — multi-turn conversations with full history, auto-compacted
 - **Cron scheduler** — recurring tasks, one-shot reminders, cron expressions with timezone
 - **Heartbeat** — periodic check of HEARTBEAT.md (implemented as a cron job)
@@ -54,6 +54,7 @@ We adopted nanobot's async message bus and single-timer cron scheduler patterns,
 - Node.js >= 20 (required by Claude Code CLI)
 - Telegram bot token from [@BotFather](https://t.me/BotFather)
 - (Optional) Feishu app with Bot capability and WebSocket event mode
+- (Optional) WeChat account for iLink Bot login (scan QR code on first run)
 
 ## Quick Start
 
@@ -74,7 +75,7 @@ cp config.example.json ~/.uclaw/config.json
 uv run python -m uclaw
 ```
 
-Then send a message to your bot on Telegram.
+Then send a message to your bot on Telegram or WeChat.
 
 ## Configuration
 
@@ -93,6 +94,10 @@ Then send a message to your bot on Telegram.
     "app_secret": "",
     "allowed_users": []
   },
+  "weixin": {
+    "enabled": false,
+    "allowed_users": ["*"]
+  },
   "claude": {
     "workspace": "~/workspace",
     "permission_mode": "bypassPermissions",
@@ -102,6 +107,18 @@ Then send a message to your bot on Telegram.
 ```
 
 Set `cli_path` if the `claude` binary isn't on PATH (e.g., `"/home/user/.local/bin/claude"`).
+
+### WeChat Channel
+
+WeChat uses Tencent's official [iLink Bot API](https://ilinkai.weixin.qq.com) — no reverse engineering, no gray-area protocols.
+
+1. Set `"weixin": {"enabled": true}` in config.json
+2. Run `uv run python -m uclaw` — a QR code appears in your terminal
+3. Scan the QR code with WeChat on your phone
+4. Token is saved to `~/.uclaw/weixin/account.json` — subsequent starts skip QR login
+
+The bot can only reply to users who message it first (enforced by iLink's `context_token` mechanism).
+Use `allowed_users: ["*"]` to accept all senders, or restrict to specific WeChat iLink user IDs.
 
 ## Cron Jobs
 
@@ -163,7 +180,8 @@ uclaw/
 │   ├── base.py      # BaseChannel ABC
 │   ├── manager.py   # channel orchestration + outbound dispatch
 │   ├── telegram.py  # Telegram long polling adapter
-│   └── feishu.py    # Feishu WebSocket adapter
+│   ├── feishu.py    # Feishu WebSocket adapter
+│   └── weixin.py    # WeChat iLink Bot long polling adapter
 └── cron/
     ├── types.py     # CronJob, CronSchedule, CronStore
     └── service.py   # single-timer cron scheduler

@@ -83,9 +83,18 @@ async def main() -> None:
             app_secret=config.feishu.app_secret,
             allowed_users=config.feishu.allowed_users,
         )
+    if config.weixin.enabled:
+        from .channels.weixin import WeixinChannel
+
+        channels["weixin"] = WeixinChannel(
+            bus=bus,
+            base_url=config.weixin.base_url,
+            allowed_users=config.weixin.allowed_users,
+            data_dir=DATA_DIR / "weixin",
+        )
 
     if not channels:
-        logger.error("No channels enabled. Enable telegram or feishu in config.json.")
+        logger.error("No channels enabled. Enable telegram, feishu, or weixin in config.json.")
         return
 
     channel_mgr = ChannelManager(bus=bus, channels=channels)
