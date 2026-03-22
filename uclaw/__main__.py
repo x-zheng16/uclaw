@@ -41,6 +41,19 @@ async def execute_cron_job(message: str, channel: str, chat_id: str) -> str:
     return result_text
 
 
+def _ensure_node_on_path() -> None:
+    """Add fnm default node to PATH if not already available."""
+    import os
+    import shutil
+
+    if shutil.which("node"):
+        return
+    fnm_default = Path.home() / ".local/share/fnm/aliases/default/bin"
+    if fnm_default.is_dir():
+        os.environ["PATH"] = str(fnm_default) + os.pathsep + os.environ.get("PATH", "")
+        logger.info("Added fnm node to PATH: %s", fnm_default)
+
+
 async def main() -> None:
     import fcntl
 
@@ -57,6 +70,8 @@ async def main() -> None:
 
     log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_fmt)
+
+    _ensure_node_on_path()
 
     # Persist logs to ~/.uclaw/logs/ with rotation (5 MB x 3 files)
     log_dir = DATA_DIR / "logs"
