@@ -147,11 +147,12 @@ class SessionRouter:
                     for block in response.content
                     if isinstance(block, TextBlock)
                 ]
-                if text_parts:
+                full_text = "".join(text_parts).strip()
+                if full_text:
                     yield OutboundMessage(
                         channel=msg.channel,
                         chat_id=msg.chat_id,
-                        text="".join(text_parts),
+                        text=full_text,
                     )
             elif isinstance(response, ResultMessage):
                 # Persist session_id for resume
