@@ -42,7 +42,18 @@ async def execute_cron_job(message: str, channel: str, chat_id: str) -> str:
 
 
 async def main() -> None:
+    import fcntl
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Acquire flock — prevents duplicate instances regardless of start method
+    lock_path = DATA_DIR / "bridge.lock"
+    lock_fd = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        logger.error("Another uclaw instance is already running (flock held)")
+        return
 
     log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_fmt)

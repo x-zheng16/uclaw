@@ -1,6 +1,7 @@
 """Simple process management for uclaw daemon."""
 from __future__ import annotations
 
+import fcntl
 import os
 import signal
 import subprocess
@@ -8,7 +9,20 @@ import sys
 import time
 from pathlib import Path
 
+LOCK_FILE = Path.home() / ".uclaw" / "bridge.lock"
 PID_FILE = Path.home() / ".uclaw" / "bridge.pid"
+
+
+def _acquire_lock() -> int | None:
+    """Try to acquire the lock file. Returns fd on success, None if already held."""
+    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(LOCK_FILE), os.O_CREAT | os.O_RDWR)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd
+    except OSError:
+        os.close(fd)
+        return None
 
 
 def _read_pid() -> int | None:
@@ -28,28 +42,14 @@ def _write_pid(pid: int) -> None:
     PID_FILE.write_text(str(pid))
 
 
-def _find_running() -> int | None:
-    """Find any running uclaw process (even without PID file)."""
-    try:
-        out = subprocess.check_output(
-            ["pgrep", "-f", "python.*-m uclaw"],
-            text=True,
-        ).strip()
-        my_pid = os.getpid()
-        for line in out.splitlines():
-            pid = int(line.strip())
-            if pid != my_pid:
-                return pid
-    except (subprocess.CalledProcessError, ValueError):
-        pass
-    return None
-
-
 def cmd_start() -> None:
-    pid = _read_pid() or _find_running()
-    if pid:
-        print(f"Already running (pid {pid})")
+    fd = _acquire_lock()
+    if fd is None:
+        pid = _read_pid()
+        print(f"Already running (pid {pid or '?'})")
         return
+    # Release lock here — the daemon subprocess will acquire it itself
+    os.close(fd)
     proc = subprocess.Popen(
         [sys.executable, "-m", "uclaw"],
         stdout=open(Path.home() / ".uclaw" / "logs" / "bridge.log", "a"),
@@ -87,11 +87,13 @@ def cmd_restart() -> None:
 
 
 def cmd_status() -> None:
-    pid = _read_pid()
-    if pid:
-        print(f"Running (pid {pid})")
-    else:
+    fd = _acquire_lock()
+    if fd is not None:
+        os.close(fd)
         print("Not running")
+    else:
+        pid = _read_pid()
+        print(f"Running (pid {pid or '?'})")
 
 
 def main() -> None:
