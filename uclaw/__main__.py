@@ -131,7 +131,7 @@ async def main() -> None:
     # Shutdown handler
     async def shutdown() -> None:
         logger.info("Shutting down...")
-        cron.stop()
+        await cron.stop()
         await channel_mgr.stop_all()
         await router.shutdown()
         logger.info("Shutdown complete")
