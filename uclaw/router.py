@@ -136,7 +136,18 @@ class SessionRouter:
         if client is None:
             client = await self._create_session(key)
 
-        await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
+        try:
+            await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
+        except Exception:
+            logger.warning("Query failed for %s, reconnecting...", key)
+            # Tear down dead client and retry once
+            self._clients.pop(key, None)
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            client = await self._create_session(key)
+            await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
 
         async for outbound in self._collect_response(client, msg):
             await self._bus.publish_outbound(outbound)
