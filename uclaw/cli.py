@@ -61,11 +61,42 @@ def cmd_start() -> None:
     print(f"Logs: tail -f ~/.uclaw/logs/bridge.log")
 
 
+def _find_lock_holder() -> int | None:
+    """Find the PID holding the lock file via /proc or lsof."""
+    import shutil
+    import subprocess
+
+    if not LOCK_FILE.exists():
+        return None
+    lsof = shutil.which("lsof")
+    if not lsof:
+        return None
+    try:
+        out = subprocess.check_output(
+            [lsof, "-t", str(LOCK_FILE)], stderr=subprocess.DEVNULL, text=True
+        )
+        for line in out.strip().splitlines():
+            pid = int(line.strip())
+            if pid != os.getpid():
+                return pid
+    except (subprocess.CalledProcessError, ValueError):
+        pass
+    return None
+
+
 def cmd_stop() -> None:
     pid = _read_pid()
     if not pid:
-        print("Not running")
-        return
+        # PID file missing — try finding process via lock file
+        fd = _acquire_lock()
+        if fd is not None:
+            os.close(fd)
+            print("Not running")
+            return
+        pid = _find_lock_holder()
+        if not pid:
+            print("Running but cannot determine PID. Kill manually.")
+            return
     os.kill(pid, signal.SIGTERM)
     for _ in range(30):  # wait up to 3s
         time.sleep(0.1)
