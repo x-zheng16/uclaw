@@ -47,6 +47,7 @@ class CronJob:
     channel: str
     chat_id: str
     enabled: bool = True
+    quiet: bool = False
     delete_after_run: bool = False
     last_run_at_ms: int | None = None
     next_run_at_ms: int | None = None
@@ -60,6 +61,7 @@ class CronJob:
             "channel": self.channel,
             "chatId": self.chat_id,
             "enabled": self.enabled,
+            "quiet": self.quiet,
             "deleteAfterRun": self.delete_after_run,
         }
         if self.last_run_at_ms is not None:
@@ -78,6 +80,7 @@ class CronJob:
             channel=d["channel"],
             chat_id=d.get("chatId", ""),
             enabled=d.get("enabled", True),
+            quiet=d.get("quiet", False),
             delete_after_run=d.get("deleteAfterRun", False),
             last_run_at_ms=d.get("lastRunAtMs"),
             next_run_at_ms=d.get("nextRunAtMs"),

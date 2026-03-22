@@ -143,6 +143,14 @@ class CronScheduler:
 
             await self._execute_job(soonest)
 
+    @staticmethod
+    def _is_no_op(text: str) -> bool:
+        """Check if a result indicates no actionable output."""
+        stripped = text.strip()
+        if not stripped:
+            return True
+        return "[NO_OP]" in stripped
+
     async def _execute_job(self, job: CronJob) -> None:
         try:
             result = await self._execute_fn(job.message, job.channel, job.chat_id)
@@ -152,10 +160,13 @@ class CronScheduler:
 
         job.last_run_at_ms = _now_ms()
 
-        # Publish the result to the bus
-        await self._bus.publish_outbound(
-            OutboundMessage(channel=job.channel, chat_id=job.chat_id, text=result)
-        )
+        # In quiet mode, skip publishing if the result is a no-op
+        if job.quiet and self._is_no_op(result):
+            logger.debug("cron job %s: quiet mode, skipping no-op result", job.id)
+        else:
+            await self._bus.publish_outbound(
+                OutboundMessage(channel=job.channel, chat_id=job.chat_id, text=result)
+            )
 
         if job.delete_after_run:
             self._store.remove(job.id)
