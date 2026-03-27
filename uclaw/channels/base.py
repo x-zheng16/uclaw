@@ -50,3 +50,6 @@ class BaseChannel(ABC):
     async def send(
         self, chat_id: str, text: str, media: list[str] | None = None
     ) -> None: ...
+
+    async def send_typing(self, chat_id: str) -> None:
+        """Signal typing indicator. No-op by default."""

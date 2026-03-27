@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import Application, MessageHandler, filters
 
 from uclaw.bus import MessageBus
@@ -99,6 +100,16 @@ class TelegramChannel(BaseChannel):
 
         text = await transcribe(file_path, groq_api_key=self._groq_api_key)
         await self._handle_message(sender_id, chat_id, text)
+
+    async def send_typing(self, chat_id: str) -> None:
+        if self._app is None:
+            return
+        try:
+            await self._app.bot.send_chat_action(
+                chat_id=int(chat_id), action=ChatAction.TYPING
+            )
+        except Exception:
+            logger.debug("telegram: send_typing failed for %s", chat_id)
 
     async def send(
         self, chat_id: str, text: str, media: list[str] | None = None

@@ -38,7 +38,10 @@ class ChannelManager:
                 logger.warning("no channel registered for %r", msg.channel)
                 continue
             try:
-                await ch.send(msg.chat_id, msg.text, msg.media)
+                if msg.kind == "typing":
+                    await ch.send_typing(msg.chat_id)
+                else:
+                    await ch.send(msg.chat_id, msg.text, msg.media)
             except Exception:
                 logger.exception("failed to send on %s", msg.channel)
 

@@ -23,7 +23,7 @@ class OutboundMessage:
     channel: str
     chat_id: str
     text: str
-    kind: Literal["new", "edit"] = "new"
+    kind: Literal["new", "edit", "typing"] = "new"
     message_id: int | None = None
     media: list[str] | None = None
 

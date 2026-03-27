@@ -136,21 +136,37 @@ class SessionRouter:
         if client is None:
             client = await self._create_session(key)
 
+        typing_task = asyncio.create_task(self._typing_loop(msg))
         try:
-            await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
-        except Exception:
-            logger.warning("Query failed for %s, reconnecting...", key)
-            # Tear down dead client and retry once
-            self._clients.pop(key, None)
             try:
-                await client.disconnect()
+                await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
             except Exception:
-                pass
-            client = await self._create_session(key)
-            await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
+                logger.warning("Query failed for %s, reconnecting...", key)
+                self._clients.pop(key, None)
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+                client = await self._create_session(key)
+                await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
 
-        async for outbound in self._collect_response(client, msg):
-            await self._bus.publish_outbound(outbound)
+            async for outbound in self._collect_response(client, msg):
+                await self._bus.publish_outbound(outbound)
+        finally:
+            typing_task.cancel()
+
+    async def _typing_loop(self, msg: InboundMessage) -> None:
+        """Send typing indicator every 4s until cancelled."""
+        try:
+            while True:
+                await self._bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel, chat_id=msg.chat_id, text="", kind="typing"
+                    )
+                )
+                await asyncio.sleep(4)
+        except asyncio.CancelledError:
+            pass
 
     async def _create_session(self, key: str) -> ClaudeSDKClient:
         cc = self._config.claude
