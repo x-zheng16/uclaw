@@ -149,6 +149,9 @@ class SessionRouter:
                         text="Interrupted.",
                     )
                 )
+        else:
+            # Forward unknown commands to Claude Code as-is
+            await self._handle_message(msg)
 
     async def _handle_message(self, msg: InboundMessage) -> None:
         key = msg.session_key
