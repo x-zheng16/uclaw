@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=xiang
-WorkingDirectory=/home/xiang
+WorkingDirectory=/home/xiang/code/uclaw
 ExecStart=/home/xiang/.local/bin/uv run --project /home/xiang/code/uclaw python -m uclaw
 Restart=always
 RestartSec=5
