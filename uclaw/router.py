@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import tempfile
+import time
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -64,6 +65,7 @@ class SessionRouter:
         self._store = SessionStore(data_dir / "sessions.json")
         self._store.load()
         self._clients: dict[str, ClaudeSDKClient] = {}
+        self._started_at = time.monotonic()
 
     async def warm_up(self) -> None:
         """Pre-create sessions for all known session keys."""
@@ -109,7 +111,25 @@ class SessionRouter:
 
     async def _handle_command(self, msg: InboundMessage) -> None:
         cmd = msg.text.strip().split()[0].lower()
-        if cmd == "/new":
+        if cmd == "/status":
+            uptime_s = int(time.monotonic() - self._started_at)
+            h, rem = divmod(uptime_s, 3600)
+            m, s = divmod(rem, 60)
+            uptime_str = f"{h}h{m:02d}m{s:02d}s" if h else f"{m}m{s:02d}s"
+            sessions = list(self._clients.keys())
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    text=(
+                        "[uclaw status]\n"
+                        + f"uptime: {uptime_str}\n"
+                        + f"active sessions: {len(sessions)}\n"
+                        + ("\n".join(f"  {k}" for k in sessions) if sessions else "  none")
+                    ),
+                )
+            )
+        elif cmd == "/new":
             await self._disconnect_session(msg.session_key)
             await self._bus.publish_outbound(
                 OutboundMessage(
@@ -139,19 +159,29 @@ class SessionRouter:
         typing_task = asyncio.create_task(self._typing_loop(msg))
         try:
             try:
-                await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
-            except Exception:
-                logger.warning("Query failed for %s, reconnecting...", key)
-                self._clients.pop(key, None)
                 try:
-                    await client.disconnect()
+                    await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
                 except Exception:
-                    pass
-                client = await self._create_session(key)
-                await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
+                    logger.warning("Query failed for %s, reconnecting...", key)
+                    self._clients.pop(key, None)
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
+                    client = await self._create_session(key)
+                    await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
 
-            async for outbound in self._collect_response(client, msg):
-                await self._bus.publish_outbound(outbound)
+                async for outbound in self._collect_response(client, msg):
+                    await self._bus.publish_outbound(outbound)
+            except Exception as exc:
+                logger.exception("Message handling failed for %s", key)
+                await self._bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=f"[error] {type(exc).__name__}: {exc}",
+                    )
+                )
         finally:
             typing_task.cancel()
 

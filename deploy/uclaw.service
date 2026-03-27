@@ -9,8 +9,10 @@ WorkingDirectory=/home/xiang/code/uclaw
 ExecStart=/home/xiang/.local/bin/uv run --project /home/xiang/code/uclaw python -m uclaw
 Restart=always
 RestartSec=5
+TimeoutStopSec=120
 Environment=HOME=/home/xiang
 EnvironmentFile=-/home/xiang/.uclaw/.env
+ExecStopPost=/home/xiang/code/uclaw/deploy/notify_crash.sh
 StandardOutput=journal
 StandardError=journal
 
