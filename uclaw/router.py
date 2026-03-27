@@ -111,7 +111,30 @@ class SessionRouter:
 
     async def _handle_command(self, msg: InboundMessage) -> None:
         cmd = msg.text.strip().split()[0].lower()
-        if cmd == "/status":
+        if cmd == "/help":
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    text=(
+                        "uclaw commands\n"
+                        "\n"
+                        "-- uclaw layer (bypass CC) --\n"
+                        "/help    show this message\n"
+                        "/status  uptime + active sessions\n"
+                        "/new     kill & restart Claude session (hard reset + free memory)\n"
+                        "/stop    interrupt current run (like pressing Esc in terminal)\n"
+                        "/tmux    list tmux sessions\n"
+                        "/tmux <session>          list windows\n"
+                        "/tmux <session> <window> list panes\n"
+                        "\n"
+                        "-- forwarded to Claude Code --\n"
+                        "/clear /reset /compact /cost /memory /doctor ...\n"
+                        "any unknown /cmd is forwarded to CC as-is"
+                    ),
+                )
+            )
+        elif cmd == "/status":
             uptime_s = int(time.monotonic() - self._started_at)
             h, rem = divmod(uptime_s, 3600)
             m, s = divmod(rem, 60)
