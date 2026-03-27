@@ -149,9 +149,40 @@ class SessionRouter:
                         text="Interrupted.",
                     )
                 )
+        elif cmd == "/tmux":
+            await self._handle_tmux(msg)
         else:
             # Forward unknown commands to Claude Code as-is
             await self._handle_message(msg)
+
+
+    async def _handle_tmux(self, msg: InboundMessage) -> None:
+        import subprocess
+        parts = msg.text.strip().split()
+        try:
+            if len(parts) == 1:
+                result = subprocess.run(
+                    ["tmux", "list-sessions"],
+                    capture_output=True, text=True, timeout=5,
+                )
+            elif len(parts) == 2:
+                result = subprocess.run(
+                    ["tmux", "list-windows", "-t", parts[1]],
+                    capture_output=True, text=True, timeout=5,
+                )
+            else:
+                target = parts[1] + ":" + parts[2]
+                result = subprocess.run(
+                    ["tmux", "list-panes", "-t", target, "-F",
+                     "#{pane_index} #{pane_current_command} #{pane_current_path}"],
+                    capture_output=True, text=True, timeout=5,
+                )
+            output = result.stdout.strip() or result.stderr.strip() or "(no output)"
+        except Exception as exc:
+            output = "[tmux error] " + str(exc)
+        await self._bus.publish_outbound(
+            OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=output)
+        )
 
     async def _handle_message(self, msg: InboundMessage) -> None:
         key = msg.session_key
