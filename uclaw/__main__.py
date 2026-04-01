@@ -26,18 +26,25 @@ async def execute_cron_job(message: str, channel: str, chat_id: str) -> str:
     from claude_agent_sdk.types import AssistantMessage, TextBlock
 
     config = load_config(CONFIG_PATH)
+    stderr_lines: list[str] = []
     options = ClaudeAgentOptions(
         cwd=config.claude.workspace,
         permission_mode=config.claude.permission_mode,
         setting_sources=config.claude.setting_sources,
         cli_path=config.claude.cli_path,
+        stderr=lambda line: stderr_lines.append(line),
     )
     result_text = ""
-    async for msg in query(prompt=message, options=options):
-        if isinstance(msg, AssistantMessage):
-            for block in msg.content:
-                if isinstance(block, TextBlock):
-                    result_text += block.text
+    try:
+        async for msg in query(prompt=message, options=options):
+            if isinstance(msg, AssistantMessage):
+                for block in msg.content:
+                    if isinstance(block, TextBlock):
+                        result_text += block.text
+    except Exception:
+        if stderr_lines:
+            logger.error("CLI stderr (%d lines): %s", len(stderr_lines), "\n".join(stderr_lines[-20:]))
+        raise
     return result_text
 
 

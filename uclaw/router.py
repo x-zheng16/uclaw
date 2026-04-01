@@ -6,6 +6,7 @@ import logging
 import tempfile
 import time
 from pathlib import Path
+from threading import Lock
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -21,6 +22,29 @@ from uclaw.config import BridgeConfig
 logger = logging.getLogger(__name__)
 
 QUERY_TIMEOUT = 600  # 10 minutes
+
+
+class HistoryLogger:
+    """Append inbound prompts to ~/.uclaw/history.jsonl (mirrors CC history format)."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._lock = Lock()
+
+    def log(self, msg: InboundMessage, session_id: str | None, project: str) -> None:
+        entry = {
+            "display": msg.text,
+            "pastedContents": {},
+            "timestamp": int(time.time() * 1000),
+            "project": project,
+            "sessionId": session_id or "",
+            "channel": msg.channel,
+        }
+        line = json.dumps(entry, ensure_ascii=False) + "\n"
+        with self._lock:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            with self._path.open("a", encoding="utf-8") as f:
+                f.write(line)
 
 
 class SessionStore:
@@ -64,6 +88,7 @@ class SessionRouter:
         self._bus = bus
         self._store = SessionStore(data_dir / "sessions.json")
         self._store.load()
+        self._history = HistoryLogger(data_dir / "history.jsonl")
         self._clients: dict[str, ClaudeSDKClient] = {}
         self._started_at = time.monotonic()
 
@@ -101,6 +126,11 @@ class SessionRouter:
         await task
 
     async def _process(self, msg: InboundMessage) -> None:
+        self._history.log(
+            msg,
+            session_id=self._store.get(msg.session_key),
+            project=str(Path(self._config.claude.workspace).expanduser()),
+        )
         try:
             if msg.text.startswith("/"):
                 await self._handle_command(msg)
@@ -148,7 +178,11 @@ class SessionRouter:
                         "[uclaw status]\n"
                         + f"uptime: {uptime_str}\n"
                         + f"active sessions: {len(sessions)}\n"
-                        + ("\n".join(f"  {k}" for k in sessions) if sessions else "  none")
+                        + (
+                            "\n".join(f"  {k}" for k in sessions)
+                            if sessions
+                            else "  none"
+                        )
                     ),
                 )
             )
@@ -178,27 +212,39 @@ class SessionRouter:
             # Forward unknown commands to Claude Code as-is
             await self._handle_message(msg)
 
-
     async def _handle_tmux(self, msg: InboundMessage) -> None:
         import subprocess
+
         parts = msg.text.strip().split()
         try:
             if len(parts) == 1:
                 result = subprocess.run(
                     ["tmux", "list-sessions"],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
             elif len(parts) == 2:
                 result = subprocess.run(
                     ["tmux", "list-windows", "-t", parts[1]],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
             else:
                 target = parts[1] + ":" + parts[2]
                 result = subprocess.run(
-                    ["tmux", "list-panes", "-t", target, "-F",
-                     "#{pane_index} #{pane_current_command} #{pane_current_path}"],
-                    capture_output=True, text=True, timeout=5,
+                    [
+                        "tmux",
+                        "list-panes",
+                        "-t",
+                        target,
+                        "-F",
+                        "#{pane_index} #{pane_current_command} #{pane_current_path}",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
             output = result.stdout.strip() or result.stderr.strip() or "(no output)"
         except Exception as exc:
@@ -217,7 +263,9 @@ class SessionRouter:
         try:
             try:
                 try:
-                    await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
+                    await asyncio.wait_for(
+                        client.query(msg.text), timeout=QUERY_TIMEOUT
+                    )
                 except Exception:
                     logger.warning("Query failed for %s, reconnecting...", key)
                     self._clients.pop(key, None)
@@ -226,7 +274,9 @@ class SessionRouter:
                     except Exception:
                         pass
                     client = await self._create_session(key)
-                    await asyncio.wait_for(client.query(msg.text), timeout=QUERY_TIMEOUT)
+                    await asyncio.wait_for(
+                        client.query(msg.text), timeout=QUERY_TIMEOUT
+                    )
 
                 async for outbound in self._collect_response(client, msg):
                     await self._bus.publish_outbound(outbound)
