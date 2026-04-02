@@ -57,6 +57,8 @@ class WeixinChannel(BaseChannel):
         base_url: str,
         allowed_users: list[str],
         data_dir: Path,
+        alert_channel: str = "",
+        alert_chat_id: str = "",
     ) -> None:
         super().__init__(bus, allowed_users)
         self._base_url = base_url.rstrip("/")
@@ -66,6 +68,8 @@ class WeixinChannel(BaseChannel):
         self._get_updates_buf: str = ""
         self._context_tokens: dict[str, str] = {}
         self._session: aiohttp.ClientSession | None = None
+        self._alert_channel = alert_channel
+        self._alert_chat_id = alert_chat_id
 
     # -- persistence --------------------------------------------------------
 
@@ -242,11 +246,16 @@ class WeixinChannel(BaseChannel):
                         MAX_CONSECUTIVE_FAILURES,
                     )
                     if errcode == SESSION_EXPIRED_ERRCODE:
-                        logger.error("weixin: session expired, re-login required")
+                        msg = (
+                            "[uclaw] WeChat session expired — re-login required.\n"
+                            "SSH to the server and run: systemctl restart uclaw\n"
+                            "(The bot will prompt for QR scan on next start.)"
+                        )
+                        logger.error("weixin: %s", msg)
+                        await self._send_alert(msg)
                         self._token = None
-                        await self._login()
-                        consecutive_failures = 0
-                        continue
+                        self._save_account()
+                        raise RuntimeError("WeChat session expired, re-login required")
                     if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                         consecutive_failures = 0
                         await asyncio.sleep(BACKOFF_DELAY)
@@ -316,6 +325,22 @@ class WeixinChannel(BaseChannel):
                 if voice_text:
                     return voice_text
         return ""
+
+    # -- alert helpers ------------------------------------------------------
+
+    async def _send_alert(self, text: str) -> None:
+        """Publish an outbound alert to the configured alert channel, if any."""
+        if not self._alert_channel or not self._alert_chat_id:
+            return
+        from uclaw.bus import OutboundMessage
+
+        await self.bus.publish_outbound(
+            OutboundMessage(
+                channel=self._alert_channel,
+                chat_id=self._alert_chat_id,
+                text=text,
+            )
+        )
 
     # -- public interface ---------------------------------------------------
 

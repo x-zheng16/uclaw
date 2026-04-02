@@ -124,6 +124,8 @@ async def main() -> None:
             base_url=config.weixin.base_url,
             allowed_users=config.weixin.allowed_users,
             data_dir=DATA_DIR / "weixin",
+            alert_channel=config.weixin.alert_channel,
+            alert_chat_id=config.weixin.alert_chat_id,
         )
 
     if not channels:

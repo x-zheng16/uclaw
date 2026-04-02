@@ -360,7 +360,7 @@ class SessionRouter:
             try:
                 await client.disconnect()
             except Exception:
-                logger.exception("Error disconnecting session %s", key)
+                logger.debug("Error disconnecting session %s (non-fatal)", key, exc_info=True)
         self._store.remove(key)
         self._store.save()
 
@@ -410,6 +410,6 @@ class SessionRouter:
                 try:
                     await client.disconnect()
                 except Exception:
-                    logger.exception("Error disconnecting %s during shutdown", key)
+                    logger.debug("Error disconnecting %s during shutdown (non-fatal)", key, exc_info=True)
         self._store.save()
         logger.info("SessionRouter shut down, %d sessions saved", len(keys))

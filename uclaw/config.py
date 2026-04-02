@@ -25,6 +25,8 @@ class WeixinConfig:
     enabled: bool = False
     base_url: str = "https://ilinkai.weixin.qq.com"
     allowed_users: list[str] = field(default_factory=lambda: ["*"])
+    alert_channel: str = ""   # channel to notify on re-login needed (e.g. "telegram")
+    alert_chat_id: str = ""   # chat_id on that channel
 
 
 @dataclass

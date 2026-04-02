@@ -8,7 +8,8 @@ from uclaw.channels.base import BaseChannel
 
 logger = logging.getLogger(__name__)
 
-RESTART_BACKOFF = 5
+RESTART_BACKOFF_INIT = 5
+RESTART_BACKOFF_MAX = 300  # 5 minutes
 
 
 class ChannelManager:
@@ -46,14 +47,17 @@ class ChannelManager:
                 logger.exception("failed to send on %s", msg.channel)
 
     async def _run_channel(self, name: str, ch: BaseChannel) -> None:
+        backoff = RESTART_BACKOFF_INIT
         while True:
             try:
                 logger.info("starting channel %s", name)
                 await ch.start()
+                backoff = RESTART_BACKOFF_INIT  # reset on clean exit
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.exception(
-                    "channel %s crashed, restarting in %ds", name, RESTART_BACKOFF
+                    "channel %s crashed, restarting in %ds", name, backoff
                 )
-                await asyncio.sleep(RESTART_BACKOFF)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
