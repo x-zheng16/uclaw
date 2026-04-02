@@ -90,6 +90,7 @@ class SessionRouter:
         self._store.load()
         self._history = HistoryLogger(data_dir / "history.jsonl")
         self._clients: dict[str, ClaudeSDKClient] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
         self._started_at = time.monotonic()
 
     async def warm_up(self) -> None:
@@ -109,21 +110,16 @@ class SessionRouter:
     async def run(self) -> None:
         """Main loop: consume inbound messages and route to sessions."""
         logger.info("SessionRouter started")
-        self._tasks: dict[str, asyncio.Task] = {}
         while True:
             msg = await self._bus.consume_inbound()
             asyncio.create_task(self._dispatch(msg))
 
     async def _dispatch(self, msg: InboundMessage) -> None:
-        """Handle a single message, serialized per session key."""
+        """Handle a single message, serialized per session key via asyncio.Lock."""
         key = msg.session_key
-        # Wait for any in-flight task on the same session key
-        prev = self._tasks.get(key)
-        if prev and not prev.done():
-            await prev
-        task = asyncio.create_task(self._process(msg))
-        self._tasks[key] = task
-        await task
+        lock = self._locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            await self._process(msg)
 
     async def _process(self, msg: InboundMessage) -> None:
         self._history.log(
@@ -259,6 +255,9 @@ class SessionRouter:
         if client is None:
             client = await self._create_session(key)
 
+        query_preview = msg.text[:80].replace("\n", " ")
+        logger.info("[%s] query: %s", key, query_preview)
+
         typing_task = asyncio.create_task(self._typing_loop(msg))
         try:
             try:
@@ -319,7 +318,41 @@ class SessionRouter:
         await client.connect()
         self._clients[key] = client
         logger.info("Created session for %s (resume=%s)", key, resume_id)
+        if resume_id:
+            await self._drain_stale_messages(client, key)
         return client
+
+    async def _drain_stale_messages(
+        self, client: ClaudeSDKClient, key: str
+    ) -> None:
+        """Drain messages buffered during CC startup (e.g., history replay on --resume).
+
+        When CC resumes a session, it may emit messages from the previous
+        conversation turn (AssistantMessage, ResultMessage) before accepting
+        new input.  If these are left in the SDK buffer, the first
+        receive_response() call would consume them instead of the actual
+        response, causing a "shifted by one" desync.
+        """
+        drained = 0
+        try:
+            async with asyncio.timeout(2.0):
+                async for msg in client.receive_messages():
+                    drained += 1
+                    logger.info(
+                        "Drained startup message for %s: %s",
+                        key,
+                        type(msg).__name__,
+                    )
+                    if isinstance(msg, ResultMessage):
+                        break
+        except (TimeoutError, asyncio.TimeoutError):
+            pass
+        except Exception:
+            logger.debug("drain error for %s (non-fatal)", key, exc_info=True)
+        if drained:
+            logger.warning(
+                "Drained %d stale message(s) from %s buffer", drained, key
+            )
 
     async def _disconnect_session(self, key: str) -> None:
         client = self._clients.pop(key, None)
@@ -333,6 +366,7 @@ class SessionRouter:
 
     async def _collect_response(self, client: ClaudeSDKClient, msg: InboundMessage):
         """Iterate response stream, yield OutboundMessages for text blocks."""
+        key = msg.session_key
         async for response in client.receive_response():
             if isinstance(response, AssistantMessage):
                 text_parts = [
@@ -342,6 +376,8 @@ class SessionRouter:
                 ]
                 full_text = "".join(text_parts).strip()
                 if full_text:
+                    reply_preview = full_text[:80].replace("\n", " ")
+                    logger.info("[%s] reply: %s", key, reply_preview)
                     yield OutboundMessage(
                         channel=msg.channel,
                         chat_id=msg.chat_id,
@@ -351,6 +387,13 @@ class SessionRouter:
                 # Persist session_id for resume
                 self._store.set(msg.session_key, response.session_id)
                 self._store.save()
+                logger.info(
+                    "[%s] result: turns=%d cost=$%.4f error=%s",
+                    key,
+                    response.num_turns,
+                    response.total_cost_usd or 0,
+                    response.is_error,
+                )
                 if response.is_error:
                     yield OutboundMessage(
                         channel=msg.channel,
