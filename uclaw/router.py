@@ -118,6 +118,14 @@ class SessionRouter:
         """Handle a single message, serialized per session key via asyncio.Lock."""
         key = msg.session_key
         lock = self._locks.setdefault(key, asyncio.Lock())
+        if lock.locked() and not msg.text.startswith("/"):
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    text="[queued] received, will reply after current task finishes",
+                )
+            )
         async with lock:
             await self._process(msg)
 
@@ -325,28 +333,32 @@ class SessionRouter:
     async def _drain_stale_messages(
         self, client: ClaudeSDKClient, key: str
     ) -> None:
-        """Drain messages buffered during CC startup (e.g., history replay on --resume).
+        """Drain ALL buffered startup messages from CC history replay on --resume.
 
-        When CC resumes a session, it may emit messages from the previous
-        conversation turn (AssistantMessage, ResultMessage) before accepting
-        new input.  If these are left in the SDK buffer, the first
-        receive_response() call would consume them instead of the actual
-        response, causing a "shifted by one" desync.
+        CC may replay multiple prior turns (AssistantMessage + ResultMessage per turn).
+        We must drain every replayed ResultMessage, not just the first, otherwise
+        leftover turns sit in the buffer and get served as responses to future queries
+        causing a "shifted by N" desync.
+
+        Strategy: keep draining turn-by-turn until 1 second of silence (no more
+        replayed messages). Each inner loop consumes one turn (up to its ResultMessage).
         """
         drained = 0
         try:
-            async with asyncio.timeout(2.0):
-                async for msg in client.receive_messages():
-                    drained += 1
-                    logger.info(
-                        "Drained startup message for %s: %s",
-                        key,
-                        type(msg).__name__,
-                    )
-                    if isinstance(msg, ResultMessage):
-                        break
-        except (TimeoutError, asyncio.TimeoutError):
-            pass
+            while True:
+                try:
+                    async with asyncio.timeout(1.0):
+                        async for msg in client.receive_messages():
+                            drained += 1
+                            logger.debug(
+                                "Drained startup message for %s: %s",
+                                key,
+                                type(msg).__name__,
+                            )
+                            if isinstance(msg, ResultMessage):
+                                break  # end of one replayed turn; loop to drain next
+                except (TimeoutError, asyncio.TimeoutError):
+                    break  # 1 s silence → no more replayed turns
         except Exception:
             logger.debug("drain error for %s (non-fatal)", key, exc_info=True)
         if drained:
