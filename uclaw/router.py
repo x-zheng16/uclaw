@@ -91,6 +91,7 @@ class SessionRouter:
         self._history = HistoryLogger(data_dir / "history.jsonl")
         self._clients: dict[str, ClaudeSDKClient] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._pending_inputs: dict[str, list[InboundMessage]] = {}
         self._started_at = time.monotonic()
 
     async def warm_up(self) -> None:
@@ -115,19 +116,50 @@ class SessionRouter:
             asyncio.create_task(self._dispatch(msg))
 
     async def _dispatch(self, msg: InboundMessage) -> None:
-        """Handle a single message, serialized per session key via asyncio.Lock."""
+        """Handle a single message, serialized per session key via asyncio.Lock.
+
+        If the session is busy, queue the message and send an ACK.  After the
+        current turn completes the lock-holder drains all queued messages into
+        one concatenated follow-up turn so Claude sees them together.
+        """
         key = msg.session_key
         lock = self._locks.setdefault(key, asyncio.Lock())
+
         if lock.locked() and not msg.text.startswith("/"):
+            # Atomically queue (no await between check and append — asyncio safe)
+            self._pending_inputs.setdefault(key, []).append(msg)
             await self._bus.publish_outbound(
                 OutboundMessage(
                     channel=msg.channel,
                     chat_id=msg.chat_id,
-                    text="[queued] received, will reply after current task finishes",
+                    text="[queued] noted, will address once current task finishes",
                 )
             )
+            return  # Don't compete for the lock — let the holder drain us
+
         async with lock:
             await self._process(msg)
+            # Drain any messages that piled up while we held the lock.
+            # Loop: processing the batch may itself attract new queued messages.
+            while True:
+                queued = self._pending_inputs.pop(key, [])
+                if not queued:
+                    break
+                texts = "\n".join(f"{i + 1}. {m.text}" for i, m in enumerate(queued))
+                batch_text = (
+                    f"While finishing that task, I also sent the following "
+                    f"{'message' if len(queued) == 1 else f'{len(queued)} messages'}. "
+                    f"Please address {'it' if len(queued) == 1 else 'all of them'}:\n{texts}"
+                )
+                # Reconstruct as an inbound message from the same sender
+                ref = queued[0]
+                batch_msg = InboundMessage(
+                    channel=ref.channel,
+                    chat_id=ref.chat_id,
+                    sender_id=ref.sender_id,
+                    text=batch_text,
+                )
+                await self._process(batch_msg)
 
     async def _process(self, msg: InboundMessage) -> None:
         self._history.log(
